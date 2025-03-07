@@ -2,6 +2,26 @@ use openssl::rsa::{Rsa, Padding};
 use openssl::pkey::PKey;
 use std::error::Error;
 
+// Custom error type for better error handling
+#[derive(Debug)]
+pub enum CryptoError {
+    TooLarge(usize, usize),
+    OpenSslError(openssl::error::ErrorStack),
+    Other(String),
+}
+
+impl std::fmt::Display for CryptoError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CryptoError::TooLarge(size, max) => write!(f, "Data too large: {} bytes (max: {} bytes)", size, max),
+            CryptoError::OpenSslError(e) => write!(f, "OpenSSL error: {}", e),
+            CryptoError::Other(msg) => write!(f, "Error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for CryptoError {}
+
 // RSA service using OpenSSL
 pub struct RsaService {
     private_key: PKey<openssl::pkey::Private>,

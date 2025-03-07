@@ -38,3 +38,10 @@ pub struct DecryptResponse {
 pub struct KeyResponse {
     pub public_key: String,
 }
+
+#[derive(Debug, Serialize)]
+pub struct ErrorResponse {
+    pub error: String,
+    pub uptime_seconds: u64,
+    pub version: String,
+}
