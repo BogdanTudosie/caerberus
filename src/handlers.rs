@@ -174,3 +174,147 @@ pub async fn decrypt(
 
     Ok(Json(response))
 }
+
+// Handler to encrypt binary data directly
+pub async fn encrypt_binary(
+    State(service): State<Arc<RsaService>>,
+    body: Bytes,
+) -> Result<BinaryResponse, (StatusCode, Json<ErrorResponse>)> {
+    let start = Instant::now();
+    
+    let encrypted = service.encrypt(&body)
+        .map_err(|e| {
+            let status = match e {
+                CryptoError::TooLarge(_, _) => StatusCode::PAYLOAD_TOO_LARGE,
+                _ => StatusCode::INTERNAL_SERVER_ERROR,
+            };
+            
+            (
+                status,
+                Json(ErrorResponse {
+                    error: format!("Encryption failed: {}", e),
+                    uptime_seconds: todo!(),
+                    version: todo!(),
+                })
+            )
+        })?;
+    
+    // Record operation timing
+    let elapsed = start.elapsed();
+    println!("encrypt_binary operation took: {:?}", elapsed);
+    
+    Ok(BinaryResponse(encrypted))
+}
+
+// Handler to decrypt binary data directly
+pub async fn decrypt_binary(
+    State(service): State<Arc<RsaService>>,
+    body: Bytes,
+) -> Result<BinaryResponse, (StatusCode, Json<ErrorResponse>)> {
+    let start = Instant::now();
+    
+    let decrypted = service.decrypt(&body)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: format!("Decryption failed: {}", e),
+                    uptime_seconds: todo!(),
+                    version: todo!(),
+                })
+            )
+        })?;
+    
+    // Record operation timing
+    let elapsed = start.elapsed();
+    println!("decrypt_binary operation took: {:?}", elapsed);
+    
+    Ok(BinaryResponse(decrypted))
+}
+
+// Handler for file uploads
+pub async fn encrypt_file(
+    State(service): State<Arc<RsaService>>,
+    mut multipart: Multipart,
+) -> Result<Json<EncryptResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let start = Instant::now();
+    
+    // Process the multipart form
+    let mut file_data = Vec::new();
+    let mut found_file = false;
+    
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: format!("Multipart error: {}", e),
+                uptime_seconds: todo!(),
+                version: todo!(),
+            })
+        )
+    })? {
+        if field.name() == Some("file") {
+            file_data = field.bytes().await.map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        error: format!("Failed to read file: {}", e),
+                        uptime_seconds: todo!(),
+                        version: todo!(),
+                    })
+                )
+            })?.to_vec();
+            found_file = true;
+            break;
+        }
+    }
+    
+    if !found_file {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "No file field found in multipart form".to_string(),
+                uptime_seconds: todo!(),
+                version: todo!(),
+            })
+        ));
+    }
+    
+    // Encrypt the file data
+    let encrypted = service.encrypt(&file_data)
+        .map_err(|e| {
+            let status = match e {
+                CryptoError::TooLarge(_, _) => StatusCode::PAYLOAD_TOO_LARGE,
+                _ => StatusCode::INTERNAL_SERVER_ERROR,
+            };
+            
+            (
+                status,
+                Json(ErrorResponse {
+                    error: format!("Encryption failed: {}", e),
+                    uptime_seconds: todo!(),
+                    version: todo!(),
+                })
+            )
+        })?;
+    
+    // Return the encrypted data as base64
+    let encrypted_b64 = base64::encode(&encrypted);
+    
+    // Record operation timing
+    let elapsed = start.elapsed();
+    println!("encrypt_file operation took: {:?}", elapsed);
+    
+    Ok(Json(EncryptResponse {
+        encrypted_data: encrypted_b64,
+    }))
+}
+
+// Service health check and statistics
+pub async fn get_stats() -> Json<StatsResponse> {
+    Json(StatsResponse {
+        status: "healthy".to_string(),
+        uptime_seconds: 0, // In a real service, calculate this
+        version: env!("CARGO_PKG_VERSION").to_string(),
+    })
+}

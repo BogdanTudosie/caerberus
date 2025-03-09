@@ -39,9 +39,16 @@ pub struct KeyResponse {
     pub public_key: String,
 }
 
+// Model for error responses
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
     pub error: String,
+}
+
+// Model for service statistics
+#[derive(Debug, Serialize)]
+pub struct StatsResponse {
+    pub status: String,
     pub uptime_seconds: u64,
     pub version: String,
 }
